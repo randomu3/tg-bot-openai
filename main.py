@@ -23,7 +23,7 @@ async def generate_response(prompt_text: str) -> str:
         model="gpt-3.5-turbo-16k-0613",
         messages=[
             {"role": "system", "content": system_message},
-            {"role": "user", "content": prompt_text}
+            {"role": "user", "content": prompt_text} 
         ]
     )
     return response.choices[0].message['content'].strip()
