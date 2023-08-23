@@ -1,7 +1,7 @@
 import openai
 import logging
 from aiogram import Bot, Dispatcher, types
-from aiogram.types import ParseMode
+from aiogram.types import ParseMode, ReplyKeyboardMarkup, KeyboardButton
 from config import CHAT_ID, OPENAI_TOKEN, TG_TOKEN
 
 # Настройка логирования
@@ -19,6 +19,18 @@ dp = Dispatcher(bot)
 last_user_message = None
 user_role = None
 waiting_for_role = False
+
+# Словарь с ролями
+roles_dict = {
+    "Экономист": "Экономист, специализирующийся на макроэкономике",
+    "Программист": "Программист, эксперт в Python и AI",
+    "Историк": "Историк, специализирующийся на средних веках"
+}
+
+main_keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+main_keyboard.add(KeyboardButton("Помощь"))
+main_keyboard.add(KeyboardButton("Остановить"))
+main_keyboard.add(KeyboardButton("Установить роль"))
 
 async def generate_response(prompt_text: str) -> str:
     global user_role
@@ -38,22 +50,42 @@ async def generate_response(prompt_text: str) -> str:
 @dp.message_handler(commands=['start'])
 async def on_start(message: types.Message):
     global waiting_for_role
-    await message.answer("Привет! Пожалуйста, укажите роль для бота.")
+    await message.answer("Привет! Пожалуйста, укажите роль для бота.", reply_markup=main_keyboard)
     waiting_for_role = True
     logger.info(f"User {message.from_user.id} started the bot.")
 
+@dp.message_handler(lambda message: message.text == "Установить роль")
+async def prompt_role(message: types.Message):
+    role_keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
+    for role in roles_dict.keys():
+        role_keyboard.add(KeyboardButton(role))
+    await message.answer("Выберите роль из предложенных или введите свою.", reply_markup=role_keyboard)
+
+@dp.message_handler(lambda message: waiting_for_role and message.text in roles_dict, content_types=types.ContentType.TEXT)
+async def set_predefined_role(message: types.Message):
+    global user_role, waiting_for_role
+    user_role = roles_dict[message.text]
+    waiting_for_role = False
+    await message.answer(f"Роль установлена как: {user_role}. Теперь вы можете начать диалог!", reply_markup=main_keyboard)
+    logger.info(f"User {message.from_user.id} set role as: {user_role}")
+
 @dp.message_handler(lambda message: waiting_for_role, content_types=types.ContentType.TEXT)
-async def set_role(message: types.Message):
+async def set_custom_role(message: types.Message):
     global user_role, waiting_for_role
     user_role = message.text
     waiting_for_role = False
-    await message.answer(f"Роль установлена как: {user_role}. Теперь вы можете начать диалог!")
+    await message.answer(f"Роль установлена как: {user_role}. Теперь вы можете начать диалог!", reply_markup=main_keyboard)
     logger.info(f"User {message.from_user.id} set role as: {user_role}")
 
-@dp.message_handler(commands=['stop'])
-async def on_stop(message: types.Message):
-    await message.answer("Бот остановлен!")
+@dp.message_handler(lambda message: message.text == "Остановить")
+async def stop_bot(message: types.Message):
+    await message.answer("Бот остановлен!", reply_markup=types.ReplyKeyboardRemove())
     logger.info(f"User {message.from_user.id} stopped the bot.")
+
+@dp.message_handler(lambda message: message.text == "Помощь")
+async def help_bot(message: types.Message):
+    help_text = "Это бот на основе OpenAI. Вы можете установить роль для бота, после чего задавать ему вопросы."
+    await message.answer(help_text, reply_markup=main_keyboard)
 
 @dp.message_handler(lambda message: not waiting_for_role, content_types=types.ContentType.TEXT)
 async def on_message(message: types.Message):
