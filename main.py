@@ -1,5 +1,6 @@
 import openai
 import logging
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ParseMode, ReplyKeyboardMarkup, KeyboardButton
 from config import CHAT_ID, OPENAI_API_KEY, API_TOKEN, WEBHOOK_PATH, WEBHOOK_URL, WEBAPP_HOST, WEBAPP_PORT, START_TEXT
@@ -44,6 +45,40 @@ async def generate_response(prompt_text: str, user_role: str) -> str:
         logger.error(f"Error generating response from OpenAI: {e}")
         return "Произошла ошибка при генерации ответа."
 
+# Создаем клавиатуру для интерактивных кнопок
+def get_inline_keyboard():
+    keyboard = InlineKeyboardMarkup()
+    keyboard.add(InlineKeyboardButton("Расскажи больше!", callback_data="more_info"))
+    keyboard.add(InlineKeyboardButton("Почему?", callback_data="why"))
+    keyboard.add(InlineKeyboardButton("Дай другой ответ.", callback_data="another_answer"))
+    return keyboard
+
+@dp.callback_query_handler(lambda c: c.data == "more_info")
+async def more_info_callback(callback_query: types.CallbackQuery):
+    await bot.answer_callback_query(callback_query.id)
+    await bot.send_message(callback_query.from_user.id, "Дополнительная информация...")  # Здесь можно использовать generate_response для получения ответа
+
+@dp.callback_query_handler(lambda c: c.data == "why")
+async def why_callback(callback_query: types.CallbackQuery):
+    await bot.answer_callback_query(callback_query.id)
+    await bot.send_message(callback_query.from_user.id, "Потому что...")  # Здесь можно использовать generate_response для получения ответа
+
+@dp.callback_query_handler(lambda c: c.data == "another_answer")
+async def another_answer_callback(callback_query: types.CallbackQuery):
+    await bot.answer_callback_query(callback_query.id)
+    response = await generate_response("Дай другой ответ на вопрос: " + last_user_message, user_role)  # Используем last_user_message для повторного запроса
+    await bot.send_message(callback_query.from_user.id, response, reply_markup=get_inline_keyboard())
+
+@dp.message_handler(lambda message: message.text == "Остановить")
+async def stop_bot(message: types.Message):
+    await message.answer("Бот остановлен!", reply_markup=types.ReplyKeyboardRemove())
+    logger.info(f"User {message.from_user.id} stopped the bot.")
+
+@dp.message_handler(lambda message: message.text == "Помощь")
+async def help_bot(message: types.Message):
+    help_text = START_TEXT
+    await message.answer(help_text, reply_markup=MAIN_KEYBOARD)
+    
 # Обработчики сообщений
 @dp.message_handler(commands=['start'])
 async def on_start(message: types.Message):
@@ -66,11 +101,13 @@ async def set_predefined_role(message: types.Message):
 
 @dp.message_handler(content_types=types.ContentType.TEXT)
 async def handle_message(message: types.Message):
+    global last_user_message
     user_message = message.text
+    last_user_message = user_message
     logger.info(f"Received message from user {message.from_user.id}: {user_message}")
 
     response = await generate_response(user_message, user_role)
-    await bot.send_message(CHAT_ID, response, parse_mode=ParseMode.MARKDOWN)
+    await bot.send_message(CHAT_ID, response, parse_mode=ParseMode.MARKDOWN, reply_markup=get_inline_keyboard())
 
 # Обработчики жизненного цикла бота
 async def on_startup(dp):
