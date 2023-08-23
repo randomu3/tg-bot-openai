@@ -2,14 +2,11 @@ import openai
 import logging
 from aiogram import Bot, Dispatcher, types
 from aiogram.types import ParseMode, ReplyKeyboardMarkup, KeyboardButton
-from config import CHAT_ID, OPENAI_TOKEN, TG_TOKEN, WEBHOOK_PATH, WEBHOOK_URL, WEBAPP_HOST, WEBAPP_PORT
+from config import CHAT_ID, OPENAI_API_KEY, API_TOKEN, WEBHOOK_PATH, WEBHOOK_URL, WEBAPP_HOST, WEBAPP_PORT, START_TEXT
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
-
-API_TOKEN = TG_TOKEN
-OPENAI_API_KEY = OPENAI_TOKEN
 
 openai.api_key = OPENAI_API_KEY
 
@@ -22,15 +19,15 @@ waiting_for_role = False
 
 # Словарь с ролями
 roles_dict = {
-    "Экономист": "Экономист, специализирующийся на макроэкономике",
     "Программист": "Программист, эксперт в Python и AI",
-    "Историк": "Историк, специализирующийся на средних веках"
+    "Экономист": "Экономист, специализирующийся на макроэкономике",
+    "Историк": "Историк, специализирующийся на средних веках",
 }
 
 main_keyboard = ReplyKeyboardMarkup(resize_keyboard=True)
-main_keyboard.add(KeyboardButton("Помощь"))
-main_keyboard.add(KeyboardButton("Остановить"))
 main_keyboard.add(KeyboardButton("Установить роль"))
+main_keyboard.add(KeyboardButton("Остановить"))
+main_keyboard.add(KeyboardButton("Помощь"))
 
 async def generate_response(prompt_text: str) -> str:
     global user_role
@@ -88,7 +85,7 @@ async def stop_bot(message: types.Message):
 
 @dp.message_handler(lambda message: message.text == "Помощь")
 async def help_bot(message: types.Message):
-    help_text = "Это бот на основе OpenAI. Вы можете установить роль для бота, после чего задавать ему вопросы."
+    help_text = START_TEXT
     await message.answer(help_text, reply_markup=main_keyboard)
 
 @dp.message_handler(lambda message: not waiting_for_role, content_types=types.ContentType.TEXT)
